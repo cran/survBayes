@@ -25,16 +25,16 @@ survBayes(formula = formula(data), data = parent.frame(), burn.in = 1000, number
   \item{burn.in}{ burn.in }
   \item{number.sample}{ number of sample }
   \item{max.grid.size}{ number of grid points }
-  \item{control}{ Object of class \code{\link[survBayes]{control}} specifying iteration limit and other control options. Default is control(...). }
-  \item{control.frailty}{ Object of class \code{\link[survBayes]{control.frailty}} specifying iteration limit and other control options.
-                        Default is control.frailty(...). }
+  \item{control}{ Object of class \code{control} specifying iteration limit and other control options. Default is survBayes.control(...). }
+  \item{control.frailty}{ Object of class \code{control.frailty} specifying parameters for the priors of frailties and other control options.
+                        Default is survBayes.control.lognormal.frailty(...) or survBayes.control.gamma.frailty(...). }
   \item{seed.set}{ setting of the seed of the random number generator }
   \item{\dots}{ further parameters }
 }
 \details{
 Fits a proportional hazards model to time to event data by a Bayesian approach. The time axis is split into \code{max.grid.size} intervals and the
 log baseline hazard is assumed to be a auto regressive process of order one.
-Right and interval censored data and a lognormal frailty term can be fitted. In case of interval censored data the assumed observation times are
+Right and interval censored data and a lognormal or gamma frailty term can be fitted. In case of interval censored data the assumed observation times are
 augmented by a piecewise exponential distribution conditioned on the respective interval.
 }
 \value{

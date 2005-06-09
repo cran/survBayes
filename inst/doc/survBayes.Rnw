@@ -20,14 +20,14 @@
 \begin{document}
 \title{survBayes: A introduction into the package}
 \author{Volkmar Henschel, Christiane Hei{\ss}, Ulrich Mansmann\\
-University of Heidelberg\\
-Department of Medical Biometry and Informatics\\
-INF 305, 69120 Heidelberg, Germany}
+University of Munich\\
+Department of Medical Informatics, Biometry and Epidemiology\\
+Marchioninistr. 15, 81377 Munich, Germany}
 \maketitle
 \begin{abstract}
 This software fits a multivariate proportional hazards model to
 interval censored event data by a Bayesian approach. 
-Right and interval censored data and a lognormal frailty term can be fitted.
+Right and interval censored data and a lognormal or gamma frailty term can be fitted.
 An example is studied and the output analysed.
 \end{abstract}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

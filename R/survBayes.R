@@ -83,7 +83,7 @@ function (formula = formula(data), data = parent.frame(), burn.in = 1000,
     if (missing(control)) 
         control <- survBayes.control(...)
     if (control$n.inter.miss) 
-        control$n.inter <- 10
+        control$n.inter <- 100
     if (control$delta.taylor.miss) 
         control$delta.taylor <- 0.1
     if (control$haz.global.miss) 
@@ -103,14 +103,27 @@ function (formula = formula(data), data = parent.frame(), burn.in = 1000,
     if (control$shape.sigma.lbh.1.miss) 
         control$shape.sigma.lbh.1 <- 1e-04
     if (!is.null(frailty.values)) {
-        if (missing(control.frailty)) 
-            control.frailty <- survBayes.control.frailty(...)
-        if (control.frailty$sigma.RE.miss) 
-            control.frailty$sigma.RE <- 100
-        if (control.frailty$rate.sigma.clust.miss) 
-            control.frailty$rate.sigma.clust <- 1e-04
-        if (control.frailty$shape.sigma.clust.miss) 
-            control.frailty$shape.sigma.clust <- 1e-04
+        if (frailty.dist == "gauss") {
+            if (missing(control.frailty)) 
+                control.frailty <- survBayes.control.lognormal.frailty(...)
+            if (control.frailty$sigma.RE.miss) 
+                control.frailty$sigma.RE <- 100
+            if (control.frailty$rate.sigma.clust.miss) 
+                control.frailty$rate.sigma.clust <- 1e-04
+            if (control.frailty$shape.sigma.clust.miss) 
+                control.frailty$shape.sigma.clust <- 1e-04
+        }
+        else {
+            if (frailty.dist == "gamma") {
+                if (missing(control.frailty)) 
+                  control.frailty <- survBayes.control.gamma.frailty(...)
+                if (control.frailty$prec.tau.cl.miss) 
+                  control.frailty$prec.tau.cl <- 1e-04
+            }
+            else {
+                stop("Invalid frailty distribution")
+            }
+        }
     }
     res <- survBayes.base(int.matrix = Z, type.ind, X.design = X, 
         frailty.values = frailty.values, frailty.dist = frailty.dist, 

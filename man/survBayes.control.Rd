@@ -5,7 +5,7 @@
 These function checks and packages the fitting options for \code{survBayes}
 }
 \usage{
-survBayes.control(n.inter = 10, delta.taylor = 0.1, haz.global = Inf, sigma.lbh.0 = 100, sigma.lbh.1 = 100, 
+survBayes.control(n.inter = 100, delta.taylor = 0.1, haz.global = Inf, sigma.lbh.0 = 100, sigma.lbh.1 = 100, 
 prec.beta = 1e-04, rate.sigma.lbh.0 = 1e-04, rate.sigma.lbh.1 = 1e-04, shape.sigma.lbh.0 = 1e-04, shape.sigma.lbh.1 = 1e-04,
 beta.init=NULL)
 }

@@ -1,4 +1,4 @@
-"survBayes.control.frailty" <-
+"survBayes.control.lognormal.frailty" <-
 function (sigma.RE = 100, rate.sigma.clust = 1e-04, shape.sigma.clust = 1e-04) 
 {
     if (sigma.RE < 0) 
