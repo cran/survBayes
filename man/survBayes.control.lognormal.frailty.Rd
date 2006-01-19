@@ -11,8 +11,8 @@ survBayes.control.lognormal.frailty(sigma.RE = 100, rate.sigma.clust = 1e-04, sh
 }
 \arguments{
   \item{sigma.RE}{ initialization of \code{sigma.RE} }
-  \item{rate.sigma.clust}{ initialization of rate of the prior of \code{rate.sigma.clust} }
-  \item{shape.sigma.clust}{ initialization of shape of the prior of \code{shape.sigma.clust} }
+  \item{rate.sigma.clust}{ initialization of rate of the gamma prior of \code{rate.sigma.clust} }
+  \item{shape.sigma.clust}{ initialization of shape of the gamma prior of \code{shape.sigma.clust} }
 }
 \value{
   A list with the same elements as the input

@@ -50,25 +50,21 @@ given by
 where $h(s)=\ln[\lambda_0(s)]$. The infinite dimensional problem
 gets to a finite dimensional one by partitioning the time axis
 $[0, \infty[$ into disjoint intervals $I_k = [\theta_{k-1},
-\theta_k[$ for $k=1, ..., K+1$ where $\theta_k$ is the time of the
+\theta_k[$ for $k=1, ..., K$ where $\theta_k$ is the time of the
 $k$-th event and $\theta_0=0$. The largest event time observed is
-$\theta_K$ and $I_{K+1}$ is taken as the interval $[\theta_K,
-\infty[$. The function $h$ is constant on the intervals $I_k$ and
-is set to $-\infty$ on $[\theta_K, \infty[$. The integral in the
-likelihood contribution of the $i$-th observation can be written
-as a sum.\\
+$\theta_K$. The function $h$ is approximated by cubic B-splines\\
 The priors for the components of the vector $\beta$ will be
-independently normal distributed with mean 0 and a small precision
-$\tau=0.001$. The prior for step function $h$ will be a autoregressive process 
-of order one with prior information on smoothness.
+multivariate normal distributed with mean 0 and a precision
+with a flat Wishart prior. The prior for the coefficients $h_k$ of the function 
+$h$ will be a autoregressive process of order one with prior information on 
+smoothness (Bayesian P-splines, see \cite{lang04}).
 Writing $h_k=h(\theta_k)$, $k=1,\dots,K$ the first order process
 is defined as $h_k=h_{k-1}+\epsilon_k$ with $\epsilon_k\sim
 N(0,\sigma_k^2)$ and $h_0\sim N(0,\sigma_0^2)$, where $h_0$ and
 ${\epsilon_k}$, $k=1,\dots,K$ are pairwise independent. The
 variances are chosen as $\sigma_k^2=\Delta_k\sigma_1^2$ and
-$\Delta_k$ may be defined by $\theta_k-\theta_{k-1}$ for $k>1$
-with $\theta_0=0$. The inverse of the covariance matrix, $\Sigma^{-1}$, is a 
-bandmatrix of bandwidth one.
+$\Delta_k$ depends on the interval lengths. The inverse of the covariance 
+matrix, $\Sigma^{-1}$, is a bandmatrix of bandwidth one.
 The parameters $\frac{1}{\sigma_0^2}=\tau_0$ and
 $\frac{1}{\sigma_1^2}=\tau_1$ are treated as hyperparameters with
 flat gamma priors setting both parameters equal to 0.001.
@@ -85,7 +81,7 @@ with a Metropolis-Hasting sampling.\\
 \subsection*{Sampling for the baseline hazard}
 With the given structure of the log baseline hazard function one
 has to sample from a Gaussian Markov Random Field (GMRF), see Rue
-\cite{rue01}.
+\cite{rue01} and  Knorr Held and Rue \cite{knorrheld02}.
 \subsection*{Sampling for the dispersion parameters}
 For the dispersion parameters $\sigma_0^2$ and $\sigma_1^2$ a flat
 Gamma prior with rate $\kappa$ and shape $\nu$ is chosen. This
@@ -118,7 +114,7 @@ a patient may shrink in the same way (because the share the same
 "environment"). Multiple aneurisms were observed per patient. This
 clustering of aneurisms is indicated by the grouping variable
 $gr$.\\
-The data is loaded and inspected for the first five patients.
+The data is loaded and inspected for the first eleven patients.
 <<aneurism load>>=
 library(survBayes)
 data(AA.data)
@@ -135,16 +131,18 @@ the package in the CRAN. Please choose at least 5000.
 AA.res<-survBayes(Surv(t.left,t.right,z*3,type="interval")~mo+lok+frailty(gr,dist="gauss"),data=AA.data,burn.in=0,number.sample=10)
 str(AA.res)
 @
-The components are
+The components are, if appropriate, 
 \begin{description}
 \item
 t.where: the time points which were chosen; the range of the Kaplan Meier 
 estimate is divided by the number of grid points and transformed back to the
 time axis;
 \item
-lbh: samples of the log baseline hazard at the grid points;
-\item
 beta: samples of the vector of covariates;
+\item
+cov.beta: samples of the covariance matrix of beta;
+\item
+lbh.coef: samples of the log baseline hazard coefficients at the grid points;
 \item
 sigma.lbh: samples of sigma.lbh.0 and sigma.lbh.1;
 \item
@@ -152,29 +150,35 @@ alpha.cluster: samples of the frailty values;
 \item
 sigma.cluster: samples of frailty variance;
 \item
+z.cluster: samples of the frailty values;
+\item
+mu.cluster: samples of the rate and shape of the gamma prior;
+\item
 m.h.performance: number of the successful performances of the 
-Metropolis-Hastings step for beta, lbh and, if appropriate, alpha
+Metropolis-Hastings step for beta, lbh and alpha.cluster or mu.cluster
 \end{description}
 The convergence is diagnosed by mean of CODA. The Raftery-Lewis diagnostic 
 gives a good description of the convergence, see \cite{mansmann00}.
 <<aneurismcoda>>=
 raftery.diag(AA.res$beta)
+raftery.diag(AA.res$cov.beta)
 raftery.diag(AA.res$sigma.lbh)
 raftery.diag(AA.res$sigma.cluster)
 raftery.diag(AA.res$alpha.cluster)
 @
-This indicates that the sample size should be increased to at least 30000 samples.\\
+This indicates that the sample size should be increased to at least 80000 samples.\\
 The estimated coefficients and cumulative baseline hazard can be
 used to estimated and plot group specific survival curves.
 <<aneurismplot, fig=TRUE>>=
 beta.est<-apply(AA.res$beta,2,mean)
-lambda0<-exp(apply(AA.res$lbh,2,mean))
-Lambda0<-c(0,cumsum(diff(AA.res$t.where)*lambda0[-length(lambda0)]))
+baseline.hazard<-survBayes.baseline.hazard(AA.res,start=1,type="cum")
+time<-baseline.hazard$time
+Lambda0<-baseline.hazard$cum.base.haz
 surv.base<-exp(-Lambda0)
-plot(AA.res$t.where,surv.base,type="s",xlab="time [years]",ylab="Survival function",lty=1)
-lines(AA.res$t.where,surv.base^exp(beta.est["mo"]),type="s",lty=2)
-lines(AA.res$t.where,surv.base^exp(beta.est["lok"]),type="s",lty=3)
-lines(AA.res$t.where,surv.base^exp(sum(beta.est[c("mo","lok")])),type="s",lty=5)
+plot(time,surv.base,type="l",xlab="time [years]",ylab="Survival function",lty=1,ylim=c(0,1))
+lines(time,surv.base^exp(beta.est["mo"]),type="l",lty=2)
+lines(time,surv.base^exp(beta.est["lok"]),type="l",lty=3)
+lines(time,surv.base^exp(sum(beta.est[c("mo","lok")])),type="l",lty=5)
 leg.names<-c("mo=0, lok=0", "mo=1, lok=0","mo=0, lok=1","mo=1, lok=1")
 legend(4,1,leg.names,lty=c(1,2,3,5),bty="n")
 @
@@ -193,6 +197,16 @@ D.~Gamerman.
 \newblock Sampling from the posterior distribution in generalized linear mixed
   models.
 \newblock {\em Statistics and Computing}, 7:57--68, 1997.
+
+\bibitem{knorrheld02}
+L.~Knorr-Held and H.~Rue.
+\newblock On block updating in markov random field models for disease mapping.
+\newblock {\em Scandinavian Journal of Statistics}, 29:597--614, 2002.
+
+\bibitem{lang04}
+S.~Lang and A.~Brezger.
+\newblock Bayesian p-splines.
+\newblock {\em Journal of Computational and Graphical Statistics}, 13:183--212, 2004.
 
 \bibitem{mansmann00}
 U.~Mansmann.

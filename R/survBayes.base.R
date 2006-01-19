@@ -4,35 +4,61 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
     control.frailty, seed.set) 
 {
     set.seed(seed.set)
-    n.inter <- control$n.inter                                      # Interval to display number of cycles
-    delta.taylor <- control$delta.taylor                            # Width for L2 approximation of exp
+    n.inter <- control$n.inter                                              # Interval to display number of cycles
+    delta.taylor <- control$delta.taylor                                    # Width for L2 approximation of exp
 #
 #       Setting up the data
 #
+#       In case of right censored data, create time and censor variable in the classical form
+#
     if (type.ind == 1) {
         time <- int.matrix[, 1]
+        time.max <- max(int.matrix[, 1])
         cens <- int.matrix[, 2]
     }
+#
+#       In case of finite interval censored data create time as the midpoint of the interval
+#       Keep the right censred observations in the classical form 
+#
     else {
         time <- ifelse(int.matrix[, 3] == 3, (int.matrix[, 1] + 
             int.matrix[, 2])/2, int.matrix[, 1])
+        time.max <- max(c(int.matrix[, 1], int.matrix[, 2]), 
+            na.rm = TRUE)
         cens <- int.matrix[, 3]/3
     }
-    pp <- ncol(X.design)                                            # number of covariates
-    nn <- nrow(X.design)                                            # number of observations
-    int <- survBayes.KM.int(time, cens, max.grid.size)
+#
+#
+    if (!is.matrix(X.design)) 
+        X.design <- matrix(X.design, ncol = 1)
+    pp <- ncol(X.design)                                                    # number of covariates
+    nn <- nrow(X.design)                                                    # number of observations
 #
 #       Setting up the time grid, time intervals
-#       The grid is build by an inverse of the KM function of these artificial right censored data. 
-#       int.left are the left boundaries of the intervals
-#       int.right are the right boundaries of the intervals
+#       int.left are the left boundries of the intervals
+#       int.right are the right boundries of the intervals
 #       int.delta is the length of the single intervals
-#       KK is the number of intervals
+#       max.grid.size is the number of intervals
+#       int are the "quasi quantiles" calculated from a linearized KM curve
+#       survBayes.KM.int(time, cens, NN) creates NN-1 intervals determined by NN time points
 #
+    KK <- max.grid.size + 2
+    int <- survBayes.KM.int(time, cens, max.grid.size + 1)
+    int[length(int)] <- time.max
     int.left <- int[-length(int)]
     int.right <- int[-1]
     int.delta <- diff(int)
-    KK <- length(int.delta)
+#
+#       The use of spline motivates to add to additional time points before the first int element
+#       as well as two time points after the last int element. 
+#
+    int.help <- c(int[1] - 2 * int.delta[1], int[1] - int.delta[1], 
+        int, time.max + 1, time.max + 2)
+    int.delta.help <- apply((cbind(diff(int.help)[-c(KK + 1, 
+        KK + 2)], diff(int.help)[-c(1, KK + 2)], diff(int.help)[-c(1, 
+        2)])), 1, mean)
+    BB.int <- sapply(1:(KK - 1), survBayes.int.basis, int.help, 
+        KK)                                                                     #       Matrix of the Basis functions at the interval points
 #
 #       Inits needed:
 #       Inits coefficients (beta)
@@ -43,7 +69,7 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
 #                       sigma.lbh.0 - variance for starting point
 #                       sigma.lbh.1 - variance for smoothness of walk
 #
-    beta.init <- control$beta.init                                  # Initial values of beta
+    beta.init <- control$beta.init
     if (is.null(beta.init)) {
         beta <- rep(0, pp)
     }
@@ -55,40 +81,64 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
             stop("Invalid length of beta.init")
         }
     }
-    if (!is.finite(control$haz.global)) {
-        haz.global <- sum(cens)/sum(time)
-    }
-    else {
-        haz.global <- control$haz.global
-    }
-    lbh <- rep(log(haz.global), KK)
-    sigma.lbh.0 <- control$sigma.lbh.0
-    sigma.lbh.1 <- control$sigma.lbh.1
+    index.vec <- 1:(KK + 1)
+    lbh.coef <- rep(0, KK + 1)
 #
 #       Parameters for prior distributions needed
 #
-    prec.beta <- control$prec.beta
-    Cov.beta.inv <- diag(pp) * prec.beta
+#       The prior of the regression coefficients starts with an independent normal distribution 
+#       and is updated by a Wishart distribution
+#
+    sigma.lbh.0 <- control$sigma.lbh.0
+    sigma.lbh.1 <- control$sigma.lbh.1
+    prec.beta.init <- control$prec.beta.init
+    Cov.beta.inv <- diag(pp) * prec.beta.init
+    rate.wishart.beta <- control$rate.wishart.beta
+    shape.wishart.beta <- control$shape.wishart.beta
+    rate.wishart.beta.mat <- matrix(0.05, nrow = pp, ncol = pp)
+    rate.wishart.beta.mat <- rate.wishart.beta.mat + diag(0.95, 
+        pp)
+    rate.wishart.beta.mat <- rate.wishart.beta * rate.wishart.beta.mat
     rate.sigma.lbh.0 <- control$rate.sigma.lbh.0
     rate.sigma.lbh.1 <- control$rate.sigma.lbh.1
     shape.sigma.lbh.0 <- control$shape.sigma.lbh.0
     shape.sigma.lbh.1 <- control$shape.sigma.lbh.1
 #
 #       Precision matrix components for random walk
+#       The following sets the framework for a first order random walk (QQ.ar1)
+#       as well as for a second order random walk (QQ.ar2).
+#       For second order random walk we also need a dispersion parameter for the second point 
+#       of the random walk.
 #
-    QQ.0 <- matrix(0, nrow = KK, ncol = KK)
+    QQ.0 <- matrix(0, nrow = KK + 1, ncol = KK + 1)
     QQ.0[1, 1] <- 1
-    QQ.1 <- diag(1/int.delta + c(0, 1/int.delta[-KK]))
-    for (i in 2:KK) {
-        QQ.1[i - 1, i] <- (-1)/int.delta[i - 1]
-        QQ.1[i, i - 1] <- (-1)/int.delta[i - 1]
+    QQ.1 <- matrix(0, nrow = KK + 1, ncol = KK + 1)
+    QQ.1[2, 2] <- 1
+    QQ.ar1 <- diag(c(1/int.delta.help, 0) + c(0, 1/int.delta.help))
+    for (i in 2:(KK + 1)) {
+        QQ.ar1[i - 1, i] <- (-1)/int.delta.help[i - 1]
+        QQ.ar1[i, i - 1] <- (-1)/int.delta.help[i - 1]
+    }
+    QQ.ar2 <- diag(c(1, 5, rep(6, KK - 3), 5, 1))
+    for (i in 3:KK) {
+        QQ.ar2[i - 1, i] <- -4
+        QQ.ar2[i, i - 1] <- -4
+    }
+    QQ.ar2[1, 2] <- -2
+    QQ.ar2[2, 1] <- -2
+    QQ.ar2[KK + 1, KK] <- -2
+    QQ.ar2[KK, KK + 1] <- -2
+    for (i in 3:(KK + 1)) {
+        QQ.ar2[i - 2, i] <- 1
+        QQ.ar2[i, i - 2] <- 1
     }
 #
 #       Preparing the sampling
 #
     iter <- 0
     beta.out <- NULL
-    lbh.out <- NULL
+    Cov.beta.out <- NULL
+    lbh.coef.out <- NULL
     sigma.lbh.out <- NULL
     m.h.performance <- NULL
 #
@@ -98,14 +148,13 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         frailty.coef <- rep(0, nn)
     }
     else {
-        n.cl <- length(unique(frailty.values))                      # number of clusters
+        n.cl <- length(unique(frailty.values))
         if (frailty.dist == "gauss") {
 #       Inits needed:
 #       alpha.cluster contains the cluster specific random effect estimates
 #       sigma.RE is the variance of the randomeffect distribution N(0,sigma.re)
             alpha.cluster <- rep(0, n.cl)
             sigma.RE <- control.frailty$sigma.RE
-#       Parameters for prior distributions needed
             rate.sigma.clust <- control.frailty$rate.sigma.clust
             shape.sigma.clust <- control.frailty$shape.sigma.clust
             alpha.cluster.out <- NULL
@@ -120,7 +169,6 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
                 z.cluster <- rep(1, n.cl)
                 mu.cl <- control.frailty$mu.cl
                 tau.cl <- log(mu.cl)
-#           Parameter for prior distribution needed
                 prec.tau.cl <- 1e-04
                 z.cluster.out <- NULL
                 mu.cl.out <- NULL
@@ -140,24 +188,37 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         m.h.beta <- 0
         m.h.lbh <- 0
         m.h.alpha <- 0
+        m.h.cl <- 0
 #
 #       make the data augmentation
 #
+        lbh.int <- as.vector(lbh.coef %*% BB.int)
+        Lambda0.int <- int.delta/2 * (exp(lbh.int[-(KK - 1)]) + 
+            exp(lbh.int[-1]))
+        Lambda0 <- c(0, cumsum(Lambda0.int))
         log.hr <- frailty.coef + X.design %*% beta
         if (type.ind == 2) {
             inf.pat.mat <- cbind(int.matrix[, 1:2], log.hr)
             time.aug <- apply(inf.pat.mat, 1, survBayes.draw.cond.pw.lin.exp, 
-                lbh = lbh, int = int)
+                int = int, Lambda0 = Lambda0)
             time <- time.aug[1, ]
             cens <- time.aug[2, ]
         }
 #
 #               Perform the beta update
 #
-        log.Lambda.0 <- log(apply(matrix(time, ncol = 1), 1, 
-            survBayes.Lambda0, left = int.left, right = int.right, 
-            ln.lambda0 = lbh))
-        offset <- frailty.coef + log.Lambda.0
+        time.int <- sapply(time, function(t, int.left, int.right) {
+            which(int <= t & c(int.right, time.max + 1) > t)
+        }, int.left, int.right)
+        time.int.mat <- t(sapply(time, function(t, int.right) {
+            as.numeric(int.right <= t)
+        }, int.right))
+        BB.time <- sapply(time, survBayes.time.basis, int.help, 
+            KK)
+        Lambda0.int.last <- (time - int[time.int])/2 * (exp(lbh.int[time.int]) + 
+            exp(as.vector(lbh.coef %*% BB.time)))
+        Lambda0 <- Lambda0[time.int] + Lambda0.int.last
+        offset <- frailty.coef + log(Lambda0)
         coef.update <- survBayes.poisson.update(beta, X.design, 
             cens, offset, Cov.beta.inv)
         u <- runif(1)
@@ -168,49 +229,150 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         if (iter > burn.in) 
             beta.out <- cbind(beta.out, beta)
 #
+#               Perform the prec.beta update
+#
+        rate.wishart <- beta %*% t(beta) + rate.wishart.beta.mat
+        shape.wishart <- shape.wishart.beta + pp
+        Cov.beta.inv.star <- rwish(v = shape.wishart, S = solve(rate.wishart))
+        if (abs(kappa(Cov.beta.inv.star)) < 1e+10) {
+            Cov.beta.inv <- Cov.beta.inv.star
+            Cov.beta <- solve(Cov.beta.inv)
+        }
+        if (iter > burn.in) {
+            Cov.beta.tmp <- Cov.beta
+            Cov.beta.tmp[lower.tri(Cov.beta.tmp)] <- NA
+            Cov.beta.out <- cbind(Cov.beta.out, na.omit(as.vector(Cov.beta.tmp)))
+        }
+#
 #               Perform the lbh update following section 3.1.2 of Rue (2001)
 #
+#               The b-term in fomula (4) of Rue 2001 is calculated
+#
         hr <- exp(frailty.coef + X.design %*% beta)
-        taylor.coef <- survBayes.taylor(lbh, delta.taylor)
-        b.vec.cens <- sapply(1:KK, survBayes.numb.events.int, 
-            time = time, cens = cens, left = int.left, right = int.right)
-        b.vec.Lambda <- sapply(1:KK, survBayes.b.fctn.Lambda, 
-            time = time, ebx = hr, left = int.left, right = int.right)
-        b.vec <- b.vec.cens - taylor.coef$b * b.vec.Lambda
+        taylor.coef.int <- survBayes.taylor(as.vector(lbh.coef %*% 
+            BB.int), delta.taylor)
+        taylor.coef.time <- survBayes.taylor(as.vector(lbh.coef %*% 
+            BB.time), delta.taylor)
+        b.vec.cens <- as.vector(cens %*% t(BB.time))
+        b.vec.Lambda.lin <- sapply(index.vec, survBayes.b.fctn.Lambda.lin, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int$b, 
+            taylor.time = taylor.coef.time$b)
+        b.vec.Lambda.quad.a <- diag(sapply(index.vec, survBayes.b.fctn.Lambda.quad.a, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int$c, 
+            taylor.time = taylor.coef.time$c))
+        b.vec.Lambda.quad.b <- cbind(rep(0, KK + 1), diag(sapply(1:KK, 
+            survBayes.b.fctn.Lambda.quad.b, time = time, time.int = time.int, 
+            time.int.mat = time.int.mat, hr = hr, int = int, 
+            int.delta = int.delta, BB.int = BB.int, BB.time = BB.time, 
+            KK = KK, taylor.int = taylor.coef.int$c, taylor.time = taylor.coef.time$c), 
+            nrow = KK + 1, ncol = KK))
+        b.vec.Lambda.quad.c <- cbind(rep(0, KK + 1), rep(0, KK + 
+            1), diag(sapply(1:(KK - 1), survBayes.b.fctn.Lambda.quad.c, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int$c, 
+            taylor.time = taylor.coef.time$c), nrow = KK + 1, 
+            ncol = KK - 1))
+        b.vec.Lambda.quad.d <- cbind(rep(0, KK + 1), rep(0, KK + 
+            1), rep(0, KK + 1), diag(sapply(1:(KK - 2), survBayes.b.fctn.Lambda.quad.d, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int$c, 
+            taylor.time = taylor.coef.time$c), nrow = KK + 1, 
+            ncol = KK - 2))
+        b.vec.Lambda.quad <- b.vec.Lambda.quad.a + b.vec.Lambda.quad.b + 
+            t(b.vec.Lambda.quad.b) + b.vec.Lambda.quad.c + t(b.vec.Lambda.quad.c) + 
+            b.vec.Lambda.quad.d + t(b.vec.Lambda.quad.d)
+        b.vec <- b.vec.cens - b.vec.Lambda.lin
 #
 #               The Q-term in fomula (4) of Rue (2001) is calculated
 #
-        QQ.hlp <- QQ.0/sigma.lbh.0 + QQ.1/sigma.lbh.1
-        QQ <- QQ.hlp + diag(taylor.coef$c * b.vec.Lambda)
+        QQ.hlp <- QQ.0/sigma.lbh.0 + QQ.ar1/sigma.lbh.1
+        QQ <- QQ.hlp + b.vec.Lambda.quad
 #
 #               Sampling a new candidate for lbh following section 3.1.2 of Rue (2001)
 #
-        LL <- survBayes.chol(QQ)
-        mu <- solve(t(LL), solve(LL, b.vec))
-        lbh.star <- mu + solve(t(LL), rnorm(KK))
+        LL <- t(chol(QQ))
+        mu.lbh <- solve(t(LL), solve(LL, b.vec))
+        lbh.coef.star <- mu.lbh + solve(t(LL), rnorm(KK + 1))
 #
 #               Metropolis Hastings step to accept the new candidate
 #
-        taylor.coef.star <- survBayes.taylor(lbh.star, delta.taylor)
-        b.vec.star <- b.vec.cens - taylor.coef.star$b * b.vec.Lambda
-        QQ.star <- QQ.hlp + diag(taylor.coef.star$c * b.vec.Lambda)
-        LL.star <- survBayes.chol(QQ.star)
-        mu.star <- solve(t(LL.star), solve(LL.star, b.vec.star))
+        taylor.coef.int.star <- survBayes.taylor(as.vector(lbh.coef.star %*% 
+            BB.int), delta.taylor)
+        taylor.coef.time.star <- survBayes.taylor(as.vector(lbh.coef.star %*% 
+            BB.time), delta.taylor)
+        b.vec.Lambda.lin.star <- sapply(index.vec, survBayes.b.fctn.Lambda.lin, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int.star$b, 
+            taylor.time = taylor.coef.time.star$b)
+        b.vec.Lambda.quad.a.star <- diag(sapply(index.vec, survBayes.b.fctn.Lambda.quad.a, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int.star$c, 
+            taylor.time = taylor.coef.time.star$c))
+        b.vec.Lambda.quad.b.star <- cbind(rep(0, KK + 1), diag(sapply(1:KK, 
+            survBayes.b.fctn.Lambda.quad.b, time = time, time.int = time.int, 
+            time.int.mat = time.int.mat, hr = hr, int = int, 
+            int.delta = int.delta, BB.int = BB.int, BB.time = BB.time, 
+            KK = KK, taylor.int = taylor.coef.int.star$c, taylor.time = taylor.coef.time.star$c), 
+            nrow = KK + 1, ncol = KK))
+        b.vec.Lambda.quad.c.star <- cbind(rep(0, KK + 1), rep(0, 
+            KK + 1), diag(sapply(1:(KK - 1), survBayes.b.fctn.Lambda.quad.c, 
+            time = time, time.int = time.int, time.int.mat = time.int.mat, 
+            hr = hr, int = int, int.delta = int.delta, BB.int = BB.int, 
+            BB.time = BB.time, KK = KK, taylor.int = taylor.coef.int.star$c, 
+            taylor.time = taylor.coef.time.star$c), nrow = KK + 
+            1, ncol = KK - 1))
+        b.vec.Lambda.quad.d.star <- cbind(rep(0, KK + 1), rep(0, 
+            KK + 1), rep(0, KK + 1), diag(sapply(1:(KK - 2), 
+            survBayes.b.fctn.Lambda.quad.d, time = time, time.int = time.int, 
+            time.int.mat = time.int.mat, hr = hr, int = int, 
+            int.delta = int.delta, BB.int = BB.int, BB.time = BB.time, 
+            KK = KK, taylor.int = taylor.coef.int.star$c, taylor.time = taylor.coef.time.star$c), 
+            nrow = KK + 1, ncol = KK - 2))
+        b.vec.Lambda.quad.star <- b.vec.Lambda.quad.a.star + 
+            b.vec.Lambda.quad.b.star + t(b.vec.Lambda.quad.b.star) + 
+            b.vec.Lambda.quad.c.star + t(b.vec.Lambda.quad.c.star) + 
+            b.vec.Lambda.quad.d.star + t(b.vec.Lambda.quad.d.star)
+        b.vec.star <- b.vec.cens - b.vec.Lambda.lin.star
+        QQ.star <- QQ.hlp + b.vec.Lambda.quad.star
+        if (any(eigen(QQ.star, symmetric = TRUE, only.values = TRUE)$values < 
+            0)) 
+            RRR <- 0
+        else {
+            LL.star <- t(chol(QQ.star))
 #
-#               This calculates the R in formula (11) of Rue (2001) for lbh.star
+#               This calculates the R in formula (11) of Rue (2001) for lbh.coef.star
 #
-        log.pi.comp <- sum(b.vec.cens * (lbh.star - lbh))
-        log.pi.comp <- log.pi.comp - sum(b.vec.Lambda * (exp(lbh.star) - 
-            exp(lbh)))
-        log.pi.comp <- log.pi.comp - 0.5 * lbh.star %*% QQ.hlp %*% 
-            lbh.star
-        log.pi.comp <- log.pi.comp + 0.5 * lbh %*% QQ.hlp %*% 
-            lbh
-        xxx <- (lbh.star - mu)
-        xxx.star <- (lbh - mu.star)
-        log.qq.comp <- 0.5 * (xxx %*% QQ %*% xxx - xxx.star %*% 
-            QQ.star %*% xxx.star)
-        RRR <- exp(log.pi.comp + log.qq.comp) * prod(diag(LL.star)/diag(LL))
+            mu.lbh.star <- solve(t(LL.star), solve(LL.star, b.vec.star))
+            lbh.int.star <- as.vector(lbh.coef.star %*% BB.int)
+            Lambda0.int.star <- int.delta/2 * (exp(lbh.int.star[-(KK - 
+                1)]) + exp(lbh.int.star[-1]))
+            Lambda0.star <- c(0, cumsum(Lambda0.int.star))
+            Lambda0.int.last.star <- (time - int[time.int])/2 * 
+                (exp(lbh.int.star[time.int]) + exp(as.vector(lbh.coef.star %*% 
+                  BB.time)))
+            Lambda0.star <- Lambda0.star[time.int] + Lambda0.int.last.star
+            log.pi.comp <- sum(b.vec.cens * (lbh.coef.star - 
+                lbh.coef))
+            log.pi.comp <- log.pi.comp - sum(hr * (Lambda0.star - 
+                Lambda0))
+            log.pi.comp <- log.pi.comp - 0.5 * lbh.coef.star %*% 
+                QQ.hlp %*% lbh.coef.star
+            log.pi.comp <- log.pi.comp + 0.5 * lbh.coef %*% QQ.hlp %*% 
+                lbh.coef
+            xxx <- (lbh.coef.star - mu.lbh)
+            xxx.star <- (lbh.coef - mu.lbh.star)
+            log.qq.comp <- 0.5 * (xxx %*% QQ %*% xxx - xxx.star %*% 
+                QQ.star %*% xxx.star)
+            RRR <- exp(log.pi.comp + log.qq.comp) * prod(diag(LL.star)/diag(LL))
+        }
 #
 #               Now the Metropolis Hastings step will be performed
 #
@@ -218,22 +380,22 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         alpha <- min(1, prop)
         u <- runif(1)
         if (u <= alpha) {
-            lbh <- lbh.star
+            lbh.coef <- lbh.coef.star
             m.h.lbh <- 1
         }
         if (iter > burn.in) 
-            lbh.out <- cbind(lbh.out, lbh)
+            lbh.coef.out <- cbind(lbh.coef.out, lbh.coef)
 #
 #               Perform the sigma.lbh update
 #               The update is done for the precisions tau.0=1/sigma.lbh.0
 #               and tau.1=1/sigma.lbh.1
 #
-        lin.form.0 <- 0.5 * (lbh %*% QQ.0 %*% lbh)
+        lin.form.0 <- 0.5 * (lbh.coef %*% QQ.0 %*% lbh.coef)
         shape.0 <- shape.sigma.lbh.0 + 1/2
         rate.0 <- rate.sigma.lbh.0 + lin.form.0
         sigma.lbh.0 <- 1/rgamma(1, shape = shape.0, rate = rate.0)
-        lin.form.1 <- 0.5 * (lbh %*% QQ.1 %*% lbh)
-        shape.1 <- shape.sigma.lbh.1 + (KK - 1)/2
+        lin.form.1 <- 0.5 * (lbh.coef %*% QQ.ar1 %*% lbh.coef)
+        shape.1 <- shape.sigma.lbh.1 + (KK)/2
         rate.1 <- (rate.sigma.lbh.1 + lin.form.1)
         sigma.lbh.1 <- 1/rgamma(1, shape = shape.1, rate = rate.1)
         if (iter > burn.in) 
@@ -243,16 +405,20 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
 #               The following takes care on the random effects
 #
         if (!is.null(frailty.values)) {
+            lbh.int <- as.vector(lbh.coef %*% BB.int)
+            Lambda0.int <- int.delta/2 * (exp(lbh.int[-(KK - 
+                1)]) + exp(lbh.int[-1]))
+            Lambda0 <- c(0, cumsum(Lambda0.int))
+            Lambda0.int.last <- (time - int[time.int])/2 * (exp(lbh.int[time.int]) + 
+                exp(as.vector(lbh.coef %*% BB.time)))
+            Lambda0 <- Lambda0[time.int] + Lambda0.int.last
+            Lambda.x <- exp(X.design %*% beta) * Lambda0
 #
 #               for lognormal frailty
 #
             if (frailty.dist == "gauss") {
                 taylor.coef <- survBayes.taylor(alpha.cluster, 
                   delta.taylor)
-                Lambda.0 <- apply(matrix(time, ncol = 1), 1, 
-                  survBayes.Lambda0, left = int.left, right = int.right, 
-                  ln.lambda0 = lbh)
-                Lambda.x <- exp(X.design %*% beta) * Lambda.0
                 b.vec.RE.cens <- as.vector(tapply(cens, frailty.values, 
                   sum))
                 b.vec.RE.Lambda <- as.vector(tapply(Lambda.x, 
@@ -314,10 +480,6 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
             else {
                 Phi.z <- as.vector(tapply(cens, frailty.values, 
                   sum))
-                Lambda.0 <- apply(matrix(time, ncol = 1), 1, 
-                  survBayes.Lambda0, left = int.left, right = int.right, 
-                  ln.lambda0 = lbh)
-                Lambda.x <- exp(X.design %*% beta) * Lambda.0
                 Psi.z <- as.vector(tapply(Lambda.x, frailty.values, 
                   sum))
                 z.cluster <- rgamma(n.cl, shape = (Phi.z + mu.cl), 
@@ -329,14 +491,14 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
                   z.cluster.out <- cbind(z.cluster.out, z.cluster)
                 }
 #
-#           Perform the mu.cl update
+#               Perform the mu.cl update
 #
                 zz <- z.cluster
                 AA <- sum(log(zz) - zz)
                 rho.star <- prec.tau.cl
 #
-#           Max of the log-density
-#           Using a normal approximation to the cond. posterior at its max as proposal distribution 
+#               Max of the log-density
+#               Using a normal approximation to the cond. posterior at its max as proposal distribution 
 #
                 newton.raph.max <- 100
                 eps.newton.raph <- 1e-05
@@ -361,13 +523,13 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
                 sigma.prop <- sqrt((-1)/ddf)
                 tau.cl.update <- rnorm(1, tau, sigma.prop)
 #
-#          Metropolis Hastings Step
-#          Make a decision on the proposal
+#               Metropolis Hastings Step
+#               Make a decision on the proposal
 #
                 tau.0 <- tau.cl
                 tau.1 <- tau.cl.update
-                prop.0 <- dnorm(tau.0, tau.1, sigma.prop)
-                prop.1 <- dnorm(tau.1, tau.0, sigma.prop)
+                prop.0 <- dnorm(tau.0, tau, sigma.prop)
+                prop.1 <- dnorm(tau.1, tau, sigma.prop)
                 mu.1 <- exp(tau.1)
                 pi.1 <- n.cl * mu.1 * tau.1 - n.cl * log(gamma(mu.1)) + 
                   mu.1 * AA - 0.5 * rho.star * tau.1 * tau.1
@@ -405,22 +567,25 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         }
     }
     if (is.null(frailty.values)) {
-        res <- list(t.where = int.left, lbh = mcmc(t(lbh.out)), 
-            beta = mcmc(t(beta.out)), sigma.lbh = mcmc(t(sigma.lbh.out)), 
-            m.h.performance = apply(m.h.performance, 1, sum))
+        res <- list(t.where = int, beta = mcmc(t(beta.out)), 
+            cov.beta = mcmc(t(Cov.beta.out)), lbh.coef = mcmc(t(lbh.coef.out)), 
+            sigma.lbh = mcmc(t(sigma.lbh.out)), m.h.performance = apply(m.h.performance, 
+                1, sum))
     }
     else {
         if (frailty.dist == "gauss") {
-            res <- list(t.where = int.left, lbh = mcmc(t(lbh.out)), 
-                beta = mcmc(t(beta.out)), sigma.lbh = mcmc(t(sigma.lbh.out)), 
-                alpha.cluster = mcmc(t(alpha.cluster.out)), sigma.cluster = mcmc(sigma.RE.out), 
-                m.h.performance = apply(m.h.performance, 1, sum))
+            res <- list(t.where = int, beta = mcmc(t(beta.out)), 
+                cov.beta = mcmc(t(Cov.beta.out)), lbh.coef = mcmc(t(lbh.coef.out)), 
+                sigma.lbh = mcmc(t(sigma.lbh.out)), alpha.cluster = mcmc(t(alpha.cluster.out)), 
+                sigma.cluster = mcmc(sigma.RE.out), m.h.performance = apply(m.h.performance, 
+                  1, sum))
         }
         else {
-            res <- list(t.where = int.left, lbh = mcmc(t(lbh.out)), 
-                beta = mcmc(t(beta.out)), sigma.lbh = mcmc(t(sigma.lbh.out)), 
-                z.cluster = mcmc(t(z.cluster.out)), mu.cluster = mcmc(mu.cl.out), 
-                m.h.performance = apply(m.h.performance, 1, sum))
+            res <- list(t.where = int, beta = mcmc(t(beta.out)), 
+                cov.beta = mcmc(t(Cov.beta.out)), lbh.coef = mcmc(t(lbh.coef.out)), 
+                sigma.lbh = mcmc(t(sigma.lbh.out)), z.cluster = mcmc(t(z.cluster.out)), 
+                mu.cluster = mcmc(mu.cl.out), m.h.performance = apply(m.h.performance, 
+                  1, sum))
         }
     }
     return(res)

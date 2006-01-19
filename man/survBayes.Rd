@@ -1,14 +1,17 @@
 \name{survBayes}
 \alias{survBayes}
-\alias{survBayes.b.fctn.Lambda}
+\alias{survBayes.b.fctn.Lambda.lin}
+\alias{survBayes.b.fctn.Lambda.quad.a}
+\alias{survBayes.b.fctn.Lambda.quad.b}
+\alias{survBayes.b.fctn.Lambda.quad.c}
+\alias{survBayes.b.fctn.Lambda.quad.d}
 \alias{survBayes.base}
-\alias{survBayes.chol}
 \alias{survBayes.draw.cond.pw.lin.exp}
+\alias{survBayes.int.basis}
 \alias{survBayes.KM.int}
-\alias{survBayes.Lambda0}
-\alias{survBayes.numb.events.int}
 \alias{survBayes.poisson.update}
 \alias{survBayes.taylor}
+\alias{survBayes.time.basis}
 \title{Fits a proportional hazards model to time to event data by a Bayesian approach}
 \description{
 Fits a proportional hazards model to time to event data by a Bayesian approach.
@@ -32,22 +35,25 @@ survBayes(formula = formula(data), data = parent.frame(), burn.in = 1000, number
   \item{\dots}{ further parameters }
 }
 \details{
-Fits a proportional hazards model to time to event data by a Bayesian approach. The time axis is split into \code{max.grid.size} intervals and the
-log baseline hazard is assumed to be a auto regressive process of order one.
-Right and interval censored data and a lognormal or gamma frailty term can be fitted. In case of interval censored data the assumed observation times are
+Fits a proportional hazards model to time to event data by a Bayesian approach. 
+The time axis is split into \code{max.grid.size} intervals and the
+log baseline hazard is assumed to be cubic spline penalized by an auto regressive process of order one.
+Right and interval censored data and a lognormal or gamma frailty term can be fitted. 
+In case of interval censored data the assumed observation times are
 augmented by a piecewise exponential distribution conditioned on the respective interval.
 }
 \value{
-The returned values are
+The returned values are, if appropriate
   \item{t.where }{used grid points}
-  \item{lbh }{samples of the log baseline hazard at the grid points}
   \item{beta}{samples of the vector of covariates}
+  \item{cov.beta}{samples of the covariance matrix of \code{beta}}
+  \item{lbh.coef }{samples of the log baseline hazard coefficients at the grid points}
   \item{sigma.lbh}{samples of sigma.lbh.0 and sigma.lbh.1}
-If frailty is included
   \item{alpha.cluster}{samples of the frailty values}
   \item{sigma.cluster}{samples of frailty variance}
-The performance of the Metropolis-Hasting steps is checked.
-  \item{m.h.performance}{ for beta, lbh and, if appropriate, alpha}
+  \item{z.cluster}{samples of the frailty values}
+  \item{mu.cluster}{samples of the rate and shape of the gamma prior}
+  \item{m.h.performance}{ The performance of the Metropolis-Hasting steps is checked for beta, lbh and, if appropriate, alpha}
 }
 \author{ V. Henschel, Ch. Heiss, U. Mansmann }
 \seealso{ \code{\link[survival]{coxph}}, \code{\link[survival]{Surv}} }
