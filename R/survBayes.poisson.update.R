@@ -1,4 +1,4 @@
-"survBayes.poisson.update" <-
+`survBayes.poisson.update` <-
 function (beta, X.design, cc, offset, R.inv) 
 {
     p.par <- dim(X.design)[2]
@@ -21,10 +21,11 @@ function (beta, X.design, cc, offset, R.inv)
         y1.star))
     prop <- exp((-t(beta.star - a) %*% R.inv %*% (beta.star - 
         a) + t(beta - a) %*% R.inv %*% (beta - a))/2 + sum(cc * 
-        theta.star - cc * theta) + sum(mu - mu.star) - t(beta.star - 
-        m) %*% solve(C) %*% (beta.star - m)/2 + t(beta - m.star) %*% 
-        solve(C.star) %*% (beta - m.star)/2) * sqrt(det(C.star)/det(C))
+        theta.star - cc * theta) + sum(mu - mu.star) + t(beta.star - 
+        m) %*% solve(C) %*% (beta.star - m)/2 - t(beta - m.star) %*% 
+        solve(C.star) %*% (beta - m.star)/2) * sqrt(det(C)/det(C.star))
     prop <- ifelse(is.na(prop), 0, prop)
     alpha <- min(c(1, prop))
     list(alpha = alpha, beta.star = beta.star, prop = prop)
 }
+

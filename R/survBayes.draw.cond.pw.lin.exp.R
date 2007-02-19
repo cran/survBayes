@@ -1,4 +1,4 @@
-"survBayes.draw.cond.pw.lin.exp" <-
+`survBayes.draw.cond.pw.lin.exp` <-
 function (inf.pat, int, Lambda0) 
 {
 #
@@ -18,3 +18,4 @@ function (inf.pat, int, Lambda0)
     }
     return(out)
 }
+

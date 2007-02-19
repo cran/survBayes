@@ -1,10 +1,10 @@
-"survBayes" <-
+`survBayes` <-
 function (formula = formula(data), data = parent.frame(), burn.in = 1000, 
-    number.sample = 1000, max.grid.size = 50, control, control.frailty, 
+    number.sample = 1000, max.grid.size = 20, control, control.frailty, 
     seed.set = 100, ...) 
 {
     require(survival)
-    require(MCMCpack)
+    require(coda)
     call <- match.call()
     m <- match.call(expand = FALSE)
     temp <- c("", "formula", "data")
@@ -45,7 +45,11 @@ function (formula = formula(data), data = parent.frame(), burn.in = 1000,
         stop("Invalid survival type")
     else {
         if (type == "right") {
-            time <- Y[, 1]
+            if (any(Y[, 1] == 0))
+                stop("zero is no survival time")
+            else {
+                time <- Y[, 1]
+            }
             cens <- Y[, 2]
             Z <- cbind(time, cens)
             type.ind <- 1
@@ -58,7 +62,9 @@ function (formula = formula(data), data = parent.frame(), burn.in = 1000,
                   Z <- cbind(Y[, 1:2], Y[, 3])
                 else Z <- cbind(Y[, 1], Y[, 3])
             }
-            Z[, 2] <- ifelse(Z[, 2] != 1, Z[, 2], NA)
+            Z[, 2] <- ifelse(Z[, 2] == 1 & Z[,3]==0, NA, Z[, 2])
+            if (any(Z[, 1] == 0 && Z[, 3] == 0)) 
+                stop("zero is no survival time")
             type.ind <- 2
         }
     }
@@ -83,19 +89,15 @@ function (formula = formula(data), data = parent.frame(), burn.in = 1000,
     if (missing(control)) 
         control <- survBayes.control(...)
     if (control$n.inter.miss) 
-        control$n.inter <- 100
+        control$n.inter <- 1000
     if (control$delta.taylor.miss) 
-        control$delta.taylor <- 0.1
+        control$delta.taylor <- 0.3
+    if (control$prec.beta.init.miss) 
+        control$prec.beta.init <- 1e-04
     if (control$sigma.lbh.0.miss) 
         control$sigma.lbh.0 <- 100
     if (control$sigma.lbh.1.miss) 
         control$sigma.lbh.1 <- 100
-    if (control$prec.beta.init.miss) 
-        control$prec.beta.init <- 1e-04
-    if (control$rate.wishart.beta.miss) 
-        control$rate.wishart.beta <- 1e-04
-    if (control$shape.wishart.beta.miss) 
-        control$shape.wishart.beta <- 1e-04
     if (control$rate.sigma.lbh.0.miss) 
         control$rate.sigma.lbh.0 <- 1e-04
     if (control$rate.sigma.lbh.1.miss) 

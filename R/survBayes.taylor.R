@@ -1,4 +1,4 @@
-"survBayes.taylor" <-
+`survBayes.taylor` <-
 function (l0, d) 
 {
     ep <- exp(l0 + d)
@@ -16,3 +16,4 @@ function (l0, d)
     c <- -c * 15/(2 * d5)
     return(list(a = a, b = b, c = c))
 }
+

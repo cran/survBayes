@@ -1,11 +1,11 @@
-"survBayes.base" <-
+`survBayes.base` <-
 function (int.matrix, type.ind, X.design, frailty.values, frailty.dist, 
     formula, burn.in, number.sample, max.grid.size, data, control, 
     control.frailty, seed.set) 
 {
     set.seed(seed.set)
-    n.inter <- control$n.inter                                              # Interval to display number of cycles
-    delta.taylor <- control$delta.taylor                                    # Width for L2 approximation of exp
+    n.inter <- control$n.inter                                          # Interval to display number of cycles
+    delta.taylor <- control$delta.taylor                                # Width for L2 approximation of exp
 #
 #       Setting up the data
 #
@@ -31,8 +31,8 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
 #
     if (!is.matrix(X.design)) 
         X.design <- matrix(X.design, ncol = 1)
-    pp <- ncol(X.design)                                                    # number of covariates
-    nn <- nrow(X.design)                                                    # number of observations
+    pp <- ncol(X.design)                                                # number of covariates
+    nn <- nrow(X.design)                                                # number of observations
 #
 #       Setting up the time grid, time intervals
 #       int.left are the left boundries of the intervals
@@ -57,8 +57,8 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
     int.delta.help <- apply((cbind(diff(int.help)[-c(KK + 1, 
         KK + 2)], diff(int.help)[-c(1, KK + 2)], diff(int.help)[-c(1, 
         2)])), 1, mean)
-    BB.int <- sapply(1:(KK - 1), survBayes.int.basis, int.help, 
-        KK)                                                                     #       Matrix of the Basis functions at the interval points
+    BB.int <- sapply(1:(KK - 1), survBayes.int.basis, int.help,         #       Matrix of the Basis functions at the interval points
+        KK)
 #
 #       Inits needed:
 #       Inits coefficients (beta)
@@ -86,19 +86,13 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
 #
 #       Parameters for prior distributions needed
 #
-#       The prior of the regression coefficients starts with an independent normal distribution 
-#       and is updated by a Wishart distribution
+#        haz.global <- sum(cens)/sum(time)
+#        lbh.coef <- rep(log(haz.global), KK +1)
 #
     sigma.lbh.0 <- control$sigma.lbh.0
     sigma.lbh.1 <- control$sigma.lbh.1
     prec.beta.init <- control$prec.beta.init
     Cov.beta.inv <- diag(pp) * prec.beta.init
-    rate.wishart.beta <- control$rate.wishart.beta
-    shape.wishart.beta <- control$shape.wishart.beta
-    rate.wishart.beta.mat <- matrix(0.05, nrow = pp, ncol = pp)
-    rate.wishart.beta.mat <- rate.wishart.beta.mat + diag(0.95, 
-        pp)
-    rate.wishart.beta.mat <- rate.wishart.beta * rate.wishart.beta.mat
     rate.sigma.lbh.0 <- control$rate.sigma.lbh.0
     rate.sigma.lbh.1 <- control$rate.sigma.lbh.1
     shape.sigma.lbh.0 <- control$shape.sigma.lbh.0
@@ -132,15 +126,6 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         QQ.ar2[i - 2, i] <- 1
         QQ.ar2[i, i - 2] <- 1
     }
-#
-#       Preparing the sampling
-#
-    iter <- 0
-    beta.out <- NULL
-    Cov.beta.out <- NULL
-    lbh.coef.out <- NULL
-    sigma.lbh.out <- NULL
-    m.h.performance <- NULL
 #
 #       the frailty term is set
 #
@@ -179,6 +164,14 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
             }
         }
     }
+#
+#       Preparing the sampling
+#
+    iter <- 0
+    beta.out <- NULL
+    lbh.coef.out <- NULL
+    sigma.lbh.out <- NULL
+    m.h.performance <- NULL
 #
 #       Starting the sampling
 #
@@ -228,21 +221,6 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         }
         if (iter > burn.in) 
             beta.out <- cbind(beta.out, beta)
-#
-#               Perform the prec.beta update
-#
-        rate.wishart <- beta %*% t(beta) + rate.wishart.beta.mat
-        shape.wishart <- shape.wishart.beta + pp
-        Cov.beta.inv.star <- rwish(v = shape.wishart, S = solve(rate.wishart))
-        if (abs(kappa(Cov.beta.inv.star)) < 1e+10) {
-            Cov.beta.inv <- Cov.beta.inv.star
-            Cov.beta <- solve(Cov.beta.inv)
-        }
-        if (iter > burn.in) {
-            Cov.beta.tmp <- Cov.beta
-            Cov.beta.tmp[lower.tri(Cov.beta.tmp)] <- NA
-            Cov.beta.out <- cbind(Cov.beta.out, na.omit(as.vector(Cov.beta.tmp)))
-        }
 #
 #               Perform the lbh update following section 3.1.2 of Rue (2001)
 #
@@ -393,11 +371,11 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         lin.form.0 <- 0.5 * (lbh.coef %*% QQ.0 %*% lbh.coef)
         shape.0 <- shape.sigma.lbh.0 + 1/2
         rate.0 <- rate.sigma.lbh.0 + lin.form.0
-        sigma.lbh.0 <- 1/rgamma(1, shape = shape.0, rate = rate.0)
+        sigma.lbh.0 <- 1/rgamma(1, shape = shape.0, rate = 1/rate.0)
         lin.form.1 <- 0.5 * (lbh.coef %*% QQ.ar1 %*% lbh.coef)
         shape.1 <- shape.sigma.lbh.1 + (KK)/2
-        rate.1 <- (rate.sigma.lbh.1 + lin.form.1)
-        sigma.lbh.1 <- 1/rgamma(1, shape = shape.1, rate = rate.1)
+        rate.1 <- rate.sigma.lbh.1 + lin.form.1
+        sigma.lbh.1 <- 1/rgamma(1, shape = shape.1, rate = 1/rate.1)
         if (iter > burn.in) 
             sigma.lbh.out <- cbind(sigma.lbh.out, c(sigma.lbh.0, 
                 sigma.lbh.1))
@@ -468,9 +446,9 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
 #               Perform the sigma.RE update
 #
                 lin.form.clust <- 0.5 * sum(alpha.cluster * alpha.cluster)
-                shape.0 <- shape.sigma.clust + n.cl/2
+                shape.0 <- shape.sigma.clust + n.cl/2 - 3/2
                 rate.0 <- rate.sigma.clust + lin.form.clust
-                sigma.RE <- 1/rgamma(1, shape = shape.0, rate = rate.0)
+                sigma.RE <- 1/rgamma(1, shape = shape.0, rate = 1/rate.0)
                 if (iter > burn.in) 
                   sigma.RE.out <- c(sigma.RE.out, sigma.RE)
             }
@@ -568,25 +546,23 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
     }
     if (is.null(frailty.values)) {
         res <- list(t.where = int, beta = mcmc(t(beta.out)), 
-            cov.beta = mcmc(t(Cov.beta.out)), lbh.coef = mcmc(t(lbh.coef.out)), 
-            sigma.lbh = mcmc(t(sigma.lbh.out)), m.h.performance = apply(m.h.performance, 
-                1, sum))
+            lbh.coef = mcmc(t(lbh.coef.out)), sigma.lbh = mcmc(t(sigma.lbh.out)), 
+            m.h.performance = apply(m.h.performance, 1, sum))
     }
     else {
         if (frailty.dist == "gauss") {
             res <- list(t.where = int, beta = mcmc(t(beta.out)), 
-                cov.beta = mcmc(t(Cov.beta.out)), lbh.coef = mcmc(t(lbh.coef.out)), 
-                sigma.lbh = mcmc(t(sigma.lbh.out)), alpha.cluster = mcmc(t(alpha.cluster.out)), 
-                sigma.cluster = mcmc(sigma.RE.out), m.h.performance = apply(m.h.performance, 
-                  1, sum))
+                lbh.coef = mcmc(t(lbh.coef.out)), sigma.lbh = mcmc(t(sigma.lbh.out)), 
+                alpha.cluster = mcmc(t(alpha.cluster.out)), sigma.cluster = mcmc(sigma.RE.out), 
+                m.h.performance = apply(m.h.performance, 1, sum))
         }
         else {
             res <- list(t.where = int, beta = mcmc(t(beta.out)), 
-                cov.beta = mcmc(t(Cov.beta.out)), lbh.coef = mcmc(t(lbh.coef.out)), 
-                sigma.lbh = mcmc(t(sigma.lbh.out)), z.cluster = mcmc(t(z.cluster.out)), 
-                mu.cluster = mcmc(mu.cl.out), m.h.performance = apply(m.h.performance, 
-                  1, sum))
+                lbh.coef = mcmc(t(lbh.coef.out)), sigma.lbh = mcmc(t(sigma.lbh.out)), 
+                z.cluster = mcmc(t(z.cluster.out)), mu.cluster = mcmc(mu.cl.out), 
+                m.h.performance = apply(m.h.performance, 1, sum))
         }
     }
     return(res)
 }
+

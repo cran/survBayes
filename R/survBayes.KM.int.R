@@ -1,4 +1,4 @@
-"survBayes.KM.int" <-
+`survBayes.KM.int` <-
 function (time, cens, n.gr) 
 {
 #
@@ -13,3 +13,4 @@ function (time, cens, n.gr)
     t.grid <- approx(y.sv, x.sv, y.grid)$y
     return(t.grid[order(t.grid)])
 }
+

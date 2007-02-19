@@ -1,6 +1,6 @@
 
 %\VignetteIndexEntry{survBayes: A introduction into the package}
-%\VignetteDepends{survival}
+%\VignetteDepends{survival,coda}
 %\VignetteKeywords{event data, proportional hazards, interval censoring, frailty, Bayesian analysis}
 %\VignettePackage{survBayes}
 
@@ -26,26 +26,26 @@ Marchioninistr. 15, 81377 Munich, Germany}
 \maketitle
 \begin{abstract}
 This software fits a multivariate proportional hazards model to
-interval censored event data by a Bayesian approach. 
-Right and interval censored data and a lognormal or gamma frailty term can be fitted.
-An example is studied and the output analysed.
+interval censored event data by a Bayesian approach. Right and
+interval censored data and a lognormal or gamma frailty term can be
+fitted. An example is studied and the output analyzed.
 \end{abstract}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{The basic model}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-The data, based on a sample of size n,
-consists of the triple $(t_i,\delta_i,\mathbf{x}_i),i=1,\dots,n$
-where $t_i$ is the time on study for subject $i$, $\delta_i$ is
-the event indicator for subject $i$ ($\delta_i = 1$ if event has
-occurred, $\delta_i = 0$ if the observation is right censored),
-$\mathbf{x}_i$ is the r-dimensional vector of covariate values for
-subject $i$.\\
+The data, based on a sample of size n, consists of the triple
+$(t_i,\delta_i,\mathbf{x}_i),i=1,\dots,n$ where $t_i$ is the time on
+study for subject $i$, $\delta_i$ is the event indicator for subject
+$i$ ($\delta_i = 1$ if event has occurred, $\delta_i = 0$ if the
+observation is right censored), $\mathbf{x}_i$ is the r-dimensional
+vector of covariate values for subject $i$.\\
 The likelihood contribution of the $i$-th single observation is
 given by
 \begin{align*}
     \lambda_0(t_i|\mathbf{x}_i)^{\delta_i}S(t_i|\mathbf{x}_i)
-    =\exp\left\{\delta_i[h(t_i)+\beta'\mathbf{x}]
-    -\mathrm{e}^{\beta'\mathbf{x}}\int_0^{t_i}\exp[h(s)]\mathrm{d}s\right\}
+    =\exp\left\{\delta_i[h(t_i)+\boldsymbol\beta'\mathbf{x}]
+    -\mathrm{e}^{\boldsymbol\beta'\mathbf{x}}
+    \int_0^{t_i}\exp[h(s)]\mathrm{d}s\right\}
 \end{align*}
 where $h(s)=\ln[\lambda_0(s)]$. The infinite dimensional problem
 gets to a finite dimensional one by partitioning the time axis
@@ -53,31 +53,28 @@ $[0, \infty[$ into disjoint intervals $I_k = [\theta_{k-1},
 \theta_k[$ for $k=1, ..., K$ where $\theta_k$ is the time of the
 $k$-th event and $\theta_0=0$. The largest event time observed is
 $\theta_K$. The function $h$ is approximated by cubic B-splines\\
-The priors for the components of the vector $\beta$ will be
-multivariate normal distributed with mean 0 and a precision
-with a flat Wishart prior. The prior for the coefficients $h_k$ of the function 
-$h$ will be a autoregressive process of order one with prior information on 
-smoothness (Bayesian P-splines, see \cite{lang04}).
-Writing $h_k=h(\theta_k)$, $k=1,\dots,K$ the first order process
-is defined as $h_k=h_{k-1}+\epsilon_k$ with $\epsilon_k\sim
-N(0,\sigma_k^2)$ and $h_0\sim N(0,\sigma_0^2)$, where $h_0$ and
-${\epsilon_k}$, $k=1,\dots,K$ are pairwise independent. The
-variances are chosen as $\sigma_k^2=\Delta_k\sigma_1^2$ and
-$\Delta_k$ depends on the interval lengths. The inverse of the covariance 
-matrix, $\Sigma^{-1}$, is a bandmatrix of bandwidth one.
-The parameters $\frac{1}{\sigma_0^2}=\tau_0$ and
+The prior for the coefficients $h_k$ of the function $h$ will be a
+autoregressive process of order one with prior information on
+smoothness (Bayesian P-splines, see \cite{lang04}). Writing
+$h_k=h(\theta_k)$, $k=1,\dots,K$ the first order process is defined
+as $h_k=h_{k-1}+\epsilon_k$ with $\epsilon_k\sim N(0,\sigma_k^2)$
+and $h_0\sim N(0,\sigma_0^2)$, where $h_0$ and ${\epsilon_k}$,
+$k=1,\dots,K$ are pairwise independent. The variances are chosen as
+$\sigma_k^2=\Delta_k\sigma_1^2$ and $\Delta_k$ depends on the
+interval lengths. The inverse of the covariance matrix,
+$\boldsymbol\Sigma^{-1}$, is a bandmatrix of bandwidth one. The
+parameters $\frac{1}{\sigma_0^2}=\tau_0$ and
 $\frac{1}{\sigma_1^2}=\tau_1$ are treated as hyperparameters with
 flat gamma priors setting both parameters equal to 0.001.
 \section{Sampling procedure}
 \subsection*{Sampling for the parameter vector}
-Aitkin and Clayton \cite{aitkin80} pointed out that the
-proportional hazards model can interpreted as a generalized linear
-model.\\
-Gamerman \cite{gamerman97} describes how one can effectively
-sample the vector of covariates in generalizes linear mixed models
-in a block updating step. This is a combination of the iterated
-least squares method (IWLS) as it is known in fitting such models
-with a Metropolis-Hasting sampling.\\
+Aitkin and Clayton \cite{aitkin80} pointed out that the proportional
+hazards model can interpreted as a generalized linear model.\\
+Gamerman \cite{gamerman97} describes how one can effectively sample
+the vector of covariates in generalizes linear mixed models in a
+block updating step. This is a combination of the iterated least
+squares method (IWLS) as it is known in fitting such models with a
+Metropolis-Hasting sampling.
 \subsection*{Sampling for the baseline hazard}
 With the given structure of the log baseline hazard function one
 has to sample from a Gaussian Markov Random Field (GMRF), see Rue
@@ -87,60 +84,59 @@ For the dispersion parameters $\sigma_0^2$ and $\sigma_1^2$ a flat
 Gamma prior with rate $\kappa$ and shape $\nu$ is chosen. This
 leads to Gamma posteriors.
 \section{Extensions of the basic model}
-Data augmentation and a multiplicative frailty model is used to analyze 
-clustered interval censored event data.
-Data augmentation is used to interfere unobserved event times. The
-potential clustering of event times within a statistical unit is
-modeled by introducing an unit specific random effect or frailty
-term into the proportional hazards model.
+Data augmentation and a multiplicative frailty model is used to
+analyze clustered interval censored event data. Data augmentation is
+used to interfere unobserved event times. The potential clustering
+of event times within a statistical unit is modeled by introducing
+an unit specific random effect or frailty term into the proportional
+hazards model.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Example}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Meisel et al. \cite{meisel00} present data on the shrinkage of
 aneurisms associated with cerebral arteriovenous malformations
 (cAVM) after embolization treatment. The time to a shrinkage of
-the aneurism to below 50\verb-%- of the baseline volume was of
-interest. Several patients had multiple aneurisms. Each patient
-was inspected at a random inspection time $obs.t$. The censoring
-variable $z$ was set to one, if at the inspection time sufficient
-shrinkage was observed, else the censoring indicator was set to
-zero.\\
+the aneurism to below 50\verb-%-
+of the baseline volume was of interest. Several patients had
+multiple aneurisms. Each patient was inspected at a random
+inspection time $obs.t$. The censoring variable $cens$ was set to 
+one, if at the inspection time sufficient shrinkage was observed, 
+else the censoring indicator was set to zero.\\
 Two covariates were considered: the degree of cAMV occlusion by
-embolization (dichotomized at 50\verb-%-, variable $mo$)
-and the location of the aneurism, whether at the midline arteries
-or at other afferent cerebral arteries, variable $lok$.\\
-The single aneurisms are not independent because aneurisms within
-a patient may shrink in the same way (because the share the same
+embolization (dichotomized at 50\verb-%-,
+variable $mo$) and the location of the aneurism, whether at the
+midline arteries or at other afferent cerebral arteries, variable
+$loc$.\\
+The single aneurisms are not independent because aneurisms within a
+patient may shrink in the same way (because the share the same
 "environment"). Multiple aneurisms were observed per patient. This
 clustering of aneurisms is indicated by the grouping variable
 $gr$.\\
 The data is loaded and inspected for the first eleven patients.
 <<aneurism load>>=
 library(survBayes)
-data(AA.data)
-AA.data[1:11,]
+data(aneurism.data)
+aneurism.data[1:11,]
 @
-The data is analyzed by applying the
-\texttt{survBayes} algorithm. 
-The fit with \texttt{survBayes} gives an object which stores all sampled 
-values in the required number after the burn in. The
-str function gives a survey over the output.
-The low number for the sample is only due to fast checking of
-the package in the CRAN. Please choose at least 5000.
+The data is analyzed by applying the \texttt{survBayes} algorithm.
+The fit with \texttt{survBayes} gives an object which stores all
+sampled values in the required number after the burn in. The
+\texttt{str} function gives a survey over the output. The low number
+for the sample is only due to fast checking of the package in the
+CRAN. Please choose at least 5000. 
 <<aneurism fit>>=
-AA.res<-survBayes(Surv(t.left,t.right,z*3,type="interval")~mo+lok+frailty(gr,dist="gauss"),data=AA.data,burn.in=0,number.sample=10)
-str(AA.res)
+control<-survBayes.control(sigma.lbh.1 = 0.01, rate.sigma.lbh.1 = 1e-3, shape.sigma.lbh.1 = 1e-3)
+aneurism.res<-survBayes(Surv(left,right,cens*3,type="interval")~mo+loc+frailty(gr,dist="gamma"), data = aneurism.data, burn.in = 0, number.sample = 10, control = control)
+str(aneurism.res) 
 @
-The components are, if appropriate, 
+The components are, if appropriate,
 \begin{description}
 \item
-t.where: the time points which were chosen; the range of the Kaplan Meier 
+t.where: the time points which were chosen; the range of the Kaplan Meier
 estimate is divided by the number of grid points and transformed back to the
 time axis;
 \item
 beta: samples of the vector of covariates;
-\item
-cov.beta: samples of the covariance matrix of beta;
 \item
 lbh.coef: samples of the log baseline hazard coefficients at the grid points;
 \item
@@ -154,36 +150,37 @@ z.cluster: samples of the frailty values;
 \item
 mu.cluster: samples of the rate and shape of the gamma prior;
 \item
-m.h.performance: number of the successful performances of the 
+m.h.performance: number of the successful performances of the
 Metropolis-Hastings step for beta, lbh and alpha.cluster or mu.cluster
 \end{description}
-The convergence is diagnosed by mean of CODA. The Raftery-Lewis diagnostic 
-gives a good description of the convergence, see \cite{mansmann00}.
-<<aneurismcoda>>=
-raftery.diag(AA.res$beta)
-raftery.diag(AA.res$cov.beta)
-raftery.diag(AA.res$sigma.lbh)
-raftery.diag(AA.res$sigma.cluster)
-raftery.diag(AA.res$alpha.cluster)
+The convergence is diagnosed by mean of CODA. The Raftery-Lewis
+diagnostic gives a good description of the convergence, see
+\cite{mansmann00}.
+<<aneurismcoda>>= 
+raftery.diag(aneurism.res$beta)
+raftery.diag(aneurism.res$lbh.coef)
+raftery.diag(aneurism.res$sigma.lbh) 
+raftery.diag(aneurism.res$z.cluster)
+raftery.diag(aneurism.res$mu.cluster) 
 @
-This indicates that the sample size should be increased to at least 80000 samples.\\
+This indicates that the sample size should be increased to at least
+80000 samples.\\
 The estimated coefficients and cumulative baseline hazard can be
 used to estimated and plot group specific survival curves.
-<<aneurismplot, fig=TRUE>>=
-beta.est<-apply(AA.res$beta,2,mean)
-baseline.hazard<-survBayes.baseline.hazard(AA.res,start=1,type="cum")
-time<-baseline.hazard$time
+<<aneurismplot, fig=TRUE>>= 
+beta.est<-apply(aneurism.res$beta,2,mean)
+baseline.hazard<-survBayes.baseline.hazard(aneurism.res,start=1,type="cum",n.inter=0)
+time<-baseline.hazard$time 
 Lambda0<-baseline.hazard$cum.base.haz
-surv.base<-exp(-Lambda0)
-plot(time,surv.base,type="l",xlab="time [years]",ylab="Survival function",lty=1,ylim=c(0,1))
+surv.base<-exp(-Lambda0) 
+plot(time,surv.base,type="l",xlab="time[years]",ylab="Survival function",lty=1,ylim=c(0,1))
 lines(time,surv.base^exp(beta.est["mo"]),type="l",lty=2)
-lines(time,surv.base^exp(beta.est["lok"]),type="l",lty=3)
-lines(time,surv.base^exp(sum(beta.est[c("mo","lok")])),type="l",lty=5)
-leg.names<-c("mo=0, lok=0", "mo=1, lok=0","mo=0, lok=1","mo=1, lok=1")
-legend(4,1,leg.names,lty=c(1,2,3,5),bty="n")
+lines(time,surv.base^exp(beta.est["loc"]),type="l",lty=3)
+lines(time,surv.base^exp(sum(beta.est[c("mo","loc")])),type="l",lty=5)
+leg.names<-c("mo=0, loc=0", "mo=1, loc=0","mo=0, loc=1","mo=1, loc=1") 
+legend(4,1,leg.names,lty=c(1,2,3,5),bty="n") 
 @
-
-
+\\
 This work was supported by DFG grant MA 1723/2-1.
 \begin{thebibliography}{6}
 \bibitem{aitkin80}
