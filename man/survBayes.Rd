@@ -12,25 +12,25 @@
 \alias{survBayes.poisson.update}
 \alias{survBayes.taylor}
 \alias{survBayes.time.basis}
-\title{ Fits a proportional hazards model to time to event data by a Bayesian approach }
+\title{Fits a proportional hazards model to time to event data by a Bayesian approach}
 \description{
 Fits a proportional hazards model to time to event data by a Bayesian approach.
 Right and interval censored data and a lognormal frailty term can be fitted.
 }
 \usage{
-survBayes(formula = formula(data), data = parent.frame(), burn.in = 1000, number.sample = 1000, max.grid.size = 20, control, control.frailty, seed.set = 100, ...)
+survBayes(formula = formula(data), data = parent.frame(), burn.in = 1000, number.sample = 1000, max.grid.size = 50, control, control.frailty, seed.set, ...)
 }
 \arguments{
   \item{formula}{ a formula object, with the response on the left of a \code{~} operator, and the terms on the right.
-                  The response must be a survival object of type \code{"right"} or \code{"interval"}
-                  as returned by the \code{Surv} function. }
-  \item{data}{ a data.frame in which to interpret the variables named in the \code{formula} }
+                 The response must be a survival object of type \code{"right"} or \code{"interval"}
+                 as returned by the \code{Surv} function. }
+  \item{data}{ a data.frame in which to interpret the variables named in the \code{formula}. }
   \item{burn.in}{ burn.in }
   \item{number.sample}{ number of sample }
   \item{max.grid.size}{ number of grid points }
   \item{control}{ Object of class \code{control} specifying iteration limit and other control options. Default is survBayes.control(...). }
   \item{control.frailty}{ Object of class \code{control.frailty} specifying parameters for the priors of frailties and other control options.
-                          Default is survBayes.control.lognormal.frailty(...) or survBayes.control.gamma.frailty(...). }
+                        Default is survBayes.control.lognormal.frailty(...) or survBayes.control.gamma.frailty(...). }
   \item{seed.set}{ setting of the seed of the random number generator }
   \item{\dots}{ further parameters }
 }
@@ -52,13 +52,13 @@ The returned values are, if appropriate
   \item{sigma.cluster}{samples of frailty variance}
   \item{z.cluster}{samples of the frailty values}
   \item{mu.cluster}{samples of the rate and shape of the gamma prior}
-  \item{m.h.performance}{ The performance of the Metropolis-Hasting steps is checked for beta, lbh and, if appropriate, alpha.cluster or mu.cluster}
+  \item{m.h.performance}{ The performance of the Metropolis-Hasting steps is checked for beta, lbh and, if appropriate, alpha}
 }
 \author{ V. Henschel, Ch. Heiss, U. Mansmann }
 \seealso{ \code{\link[survival]{coxph}}, \code{\link[survival]{Surv}} }
 \examples{
-data(aneurism.data)
-control<-survBayes.control(sigma.lbh.1=0.01,rate.sigma.lbh.1 = 1e-3, shape.sigma.lbh.1 = 1e-3)
-aneurism.res<-survBayes(Surv(left,right,cens*3,type="interval")~mo+loc+frailty(gr,dist="gamma"),data=aneurism.data,burn.in=0,number.sample=10,control=control)
+data(AA.data)
+control<-survBayes.control(delta.taylor = 0.3, sigma.lbh.1=0.01,rate.sigma.lbh.1 = 1e-3, shape.sigma.lbh.1 = 1e-3)
+AA.res<-survBayes(Surv(t.left,t.right,z*3,type="interval")~mo+lok+frailty(gr,dist="gamma"),data=AA.data,burn.in=0,number.sample=10,control=control)
 }
 \keyword{ survival }

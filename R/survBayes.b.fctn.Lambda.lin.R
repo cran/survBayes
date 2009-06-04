@@ -1,4 +1,4 @@
-`survBayes.b.fctn.Lambda.lin` <-
+"survBayes.b.fctn.Lambda.lin" <-
 function (nth, time, time.int, time.int.mat, hr, int, int.delta, 
     BB.int, BB.time, KK, taylor.int, taylor.time) 
 {
@@ -13,4 +13,3 @@ function (nth, time, time.int, time.int.mat, hr, int, int.delta,
     weighted.Lambda.ind <- interval.part + rest.part
     return(sum(hr * weighted.Lambda.ind))
 }
-

@@ -1,4 +1,4 @@
-`survBayes.poisson.update` <-
+"survBayes.poisson.update" <-
 function (beta, X.design, cc, offset, R.inv) 
 {
     p.par <- dim(X.design)[2]
@@ -28,4 +28,3 @@ function (beta, X.design, cc, offset, R.inv)
     alpha <- min(c(1, prop))
     list(alpha = alpha, beta.star = beta.star, prop = prop)
 }
-

@@ -1,16 +1,29 @@
-`survBayes.baseline.hazard` <-
-function (surv.res, type = "log", ci = FALSE, n.inter = 3, start = NULL, 
+"survBayes.baseline.hazard" <-
+function (surv.res, type = "log", n.inter = 3, start = NULL, 
     end = NULL, thin = 1) 
 {
     int <- surv.res$t.where
+    if (!is.null(start)) {
+        if (!is.null(end)) 
+            lbh.coef <- apply(window(surv.res$lbh.coef, start = start, 
+                end = end, thin = thin), 2, mean)
+        else lbh.coef <- apply(window(surv.res$lbh.coef, start = start, 
+            thin = thin), 2, mean)
+    }
+    else {
+        if (!is.null(end)) 
+            lbh.coef <- apply(window(surv.res$lbh.coef, end = end, 
+                thin = thin), 2, mean)
+        else lbh.coef <- apply(window(surv.res$lbh.coef, thin = thin), 
+            2, mean)
+    }
     time.max <- max(int)
     KK <- length(int) + 1
     int.left <- int[-(KK - 1)]
     int.right <- int[-1]
     int.delta <- diff(int)
     int.help <- c(int[1] - 2 * int.delta[1], int[1] - int.delta[1], 
-        int, time.max + int.delta[KK - 2], time.max + int.delta[KK - 
-            2])
+        int, time.max + 1, time.max + 2)
     BB.int <- sapply(1:(KK - 1), survBayes.int.basis, int.help, 
         KK)
     time <- NULL
@@ -22,72 +35,38 @@ function (surv.res, type = "log", ci = FALSE, n.inter = 3, start = NULL,
         BB.time <- sapply(time, survBayes.time.basis, int.help, 
             KK)
     }
-    if (!is.null(start)) {
-        if (!is.null(end)) {
-            lbh.coef <- window(surv.res$lbh.coef, start = start, 
-                end = end, thin = thin)
-        }
-        else {
-            lbh.coef <- window(surv.res$lbh.coef, start = start, 
-                thin = thin)
-        }
-    }
-    else {
-        if (!is.null(end)) {
-            lbh.coef <- window(surv.res$lbh.coef, end = end, 
-                thin = thin)
-        }
-        else {
-            lbh.coef <- window(surv.res$lbh.coef, thin = thin)
-        }
-    }
     if (type != "cum") {
         time <- c(int, time)
         BB <- cbind(BB.int, BB.time)[, order(time)]
         time <- time[order(time)]
-        lbh <- lbh.coef %*% BB
-        lbh.mean <- apply(lbh, 2, mean)
-        if (ci) 
-            lbh.ci <- apply(lbh, 2, quantile, probs = c(0.025, 
-                0.975))
-        if (type == "log") {
-            baseline.hazard <- data.frame(time = time, log.base.haz = lbh.mean)
-            if (ci) 
-                baseline.hazard <- data.frame(time = time, log.base.haz = lbh.mean, 
-                  log.base.haz.lower = lbh.ci[1, ], log.base.haz.upper = lbh.ci[2, 
-                    ])
-        }
-        if (type == "plain") {
-            baseline.hazard <- data.frame(time = time, base.haz = exp(lbh.mean))
-            if (ci) 
-                baseline.hazard <- data.frame(time = time, base.haz = exp(lbh.mean), 
-                  base.haz.lower = exp(lbh.ci[1, ]), base.haz.upper = exp(lbh.ci[2, 
-                    ]))
-        }
+        lbh <- as.vector(lbh.coef %*% BB)
+        if (type == "log") 
+            baseline.hazard <- data.frame(time = time, log.base.haz = lbh)
+        if (type == "plain") 
+            baseline.hazard <- data.frame(time = time, base.haz = exp(lbh))
     }
     else {
-        n.samples <- dim(lbh.coef)[1]
-        lbh.int <- lbh.coef %*% BB.int
-        Lambda0.int <- (rep(1, n.samples) %*% t(int.delta)) * 
-            (exp(lbh.int[, -(KK - 1)]) + exp(lbh.int[, -1]))
-        Lambda0.int <- rbind(rep(0, n.samples), apply(Lambda0.int, 
-            1, cumsum))
+        lbh.int <- as.vector(lbh.coef %*% BB.int)
+        Lambda0.int <- int.delta/2 * (exp(lbh.int[-(KK - 1)]) + 
+            exp(lbh.int[-1]))
+        Lambda0.int <- c(0, cumsum(Lambda0.int))
         Lambda0.time <- NULL
         if (n.inter >= 1) {
-            warning("n.inter>0 not allowed for type=cum, set to 0")
+            time.int <- sapply(time, function(t, int.left, int.right) {
+                which(int <= t & c(int.right, time.max + 1) > 
+                  t)
+            }, int.left, int.right)
+            time.int.mat <- t(sapply(time, function(t, int.right) {
+                as.numeric(int.right <= t)
+            }, int.right))
+            Lambda0.int.last <- (time - int[time.int])/2 * (exp(lbh.int[time.int]) + 
+                exp(as.vector(lbh.coef %*% BB.time)))
+            Lambda0.time <- Lambda0.int[time.int] + Lambda0.int.last
         }
-        time <- int
-        Lambda0 <- Lambda0.int
-        Lambda0.mean <- apply(Lambda0, 1, mean)
-        if (ci) 
-            Lambda0.ci <- apply(Lambda0, 1, quantile, probs = c(0.025, 
-                0.975))
-        baseline.hazard <- data.frame(time = time, cum.base.haz = Lambda0.mean)
-        if (ci) 
-            baseline.hazard <- data.frame(time = time, cum.base.haz = Lambda0.mean, 
-                cum.base.haz.lower = Lambda0.ci[1, ], cum.base.haz.upper = Lambda0.ci[2, 
-                  ])
+        time <- c(int, time)
+        Lambda0 <- c(Lambda0.int, Lambda0.time)[order(time)]
+        time <- time[order(time)]
+        baseline.hazard <- data.frame(time = time, cum.base.haz = Lambda0)
     }
     return(baseline.hazard)
 }
-

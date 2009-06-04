@@ -1,4 +1,4 @@
-`survBayes.time.basis` <-
+"survBayes.time.basis" <-
 function (t, int, KK) 
 {
 #
@@ -27,4 +27,3 @@ function (t, int, KK)
     return(c(rep(0, int.number - 3), b1, b2, b3, b4, rep(0, KK))[1:(KK + 
         1)])
 }
-

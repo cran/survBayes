@@ -18,7 +18,4 @@ survBayes.control.lognormal.frailty(sigma.RE = 100, rate.sigma.clust = 1e-04, sh
   A list with the same elements as the input
 }
 \author{ V. Henschel, Ch. Heiss, U. Mansmann }
-\examples{
-
-}
 \keyword{ survival }

@@ -1,4 +1,4 @@
-`survBayes.int.basis` <-
+"survBayes.int.basis" <-
 function (number, int, KK) 
 {
 #
@@ -20,4 +20,3 @@ function (number, int, KK)
     return(c(rep(0, number - 1), b1, b2, b3, rep(0, KK - number - 
         1)))
 }
-

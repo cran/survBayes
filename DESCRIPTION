@@ -1,12 +1,16 @@
 Package: survBayes
-Type: Package
-Title: Fits a proportional hazards model to time to event data by a Bayesian approach
-Version: 0.2.1.1
-Date: 2007-02-19
+Title: Fits a proportional hazards model to time to event data by a
+        Bayesian approach
+Version: 0.2.2
+Date: 2009-06-04
 Author: Volkmar Henschel, Christiane Heiss, Ulrich Mansmann
-Maintainer: ORPHANED
-Description: Fits a proportional hazards model to time to event data by a Bayesian approach.
-            Right and interval censored data and a lognormal or gamma frailty term can be fitted.
-License: GPL Version 2 or newer
+        <mansmann@ibe.med.uni-muenchen.de>
+Description: Fits a proportional hazards model to time to event data by
+        a Bayesian approach. Right and interval censored data and a
+        lognormal frailty term can be fitted.
+Maintainer: Volkmar Henschel <vhenschel@gmx.de>
+License: GPL (>= 2)
 Depends: survival, coda
-Packaged: Mon Feb 23 11:44:12 2009; hornik
+Packaged: 2012-10-29 08:59:52 UTC; ripley
+Repository: CRAN
+Date/Publication: 2012-10-29 08:59:52

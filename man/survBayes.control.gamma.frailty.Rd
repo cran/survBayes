@@ -18,7 +18,4 @@ survBayes.control.gamma.frailty(mu.cl = 1, prec.tau.cl = 1e-04)
   A list with the same element as the input
 }
 \author{ V. Henschel, U. Mansmann }
-\examples{
-
-}
 \keyword{ survival }

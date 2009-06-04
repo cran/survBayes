@@ -1,7 +1,7 @@
-`survBayes.base` <-
+"survBayes.base" <-
 function (int.matrix, type.ind, X.design, frailty.values, frailty.dist, 
-    formula, burn.in, number.sample, max.grid.size, data, control, 
-    control.frailty, seed.set) 
+    formula, burn.in, number.sample, max.grid.size = 20, data, 
+    control, control.frailty, seed.set) 
 {
     set.seed(seed.set)
     n.inter <- control$n.inter                                          # Interval to display number of cycles
@@ -169,6 +169,7 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
 #
     iter <- 0
     beta.out <- NULL
+    Cov.beta.out <- NULL
     lbh.coef.out <- NULL
     sigma.lbh.out <- NULL
     m.h.performance <- NULL
@@ -181,6 +182,7 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         m.h.beta <- 0
         m.h.lbh <- 0
         m.h.alpha <- 0
+        m.h.sigma.RE <- 0
         m.h.cl <- 0
 #
 #       make the data augmentation
@@ -536,7 +538,7 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
         else {
             if (frailty.dist == "gauss") {
                 m.h.performance <- cbind(m.h.performance, c(m.h.beta, 
-                  m.h.lbh, m.h.alpha))
+                  m.h.lbh, m.h.alpha, m.h.sigma.RE))
             }
             else {
                 m.h.performance <- cbind(m.h.performance, c(m.h.beta, 
@@ -565,4 +567,3 @@ function (int.matrix, type.ind, X.design, frailty.values, frailty.dist,
     }
     return(res)
 }
-
